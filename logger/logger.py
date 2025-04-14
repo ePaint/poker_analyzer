@@ -128,6 +128,7 @@ loggers_to_disable = [
     'matplotlib',
     'matplotlib.pyplot',
     'matplotlib.font_manager',
+    'PIL.PngImagePlugin',
 ]
 
 for logger_name in loggers_to_disable:
