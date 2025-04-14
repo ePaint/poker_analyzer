@@ -1,0 +1,25 @@
+MOVE_FILES_TO_PROCESSED_FOLDER: False
+ADD_TIMESTAMP_TO_PROCESSED_FILES: True
+CARD_IMAGE_FOLDER: "media/cards"
+LOG_TO_FILE: False
+INPUT_FOLDER: "input"
+OUTPUT_FOLDER: "output"
+
+# noinspection YAMLIncompatibleTypes
+KPIS:
+  - display_name: "99"
+    requirements:
+      - column: "best_hand"
+        operation: "eq"
+        value: "One Pair"
+      - column: "pair_rank"
+        operation: "in"
+        value: 9
+  - display_name: "AA"
+    requirements:
+        - column: "best_hand"
+          operation: "eq"
+          value: "One Pair"
+        - column: "pair_rank"
+          operation: "in"
+          value: 14

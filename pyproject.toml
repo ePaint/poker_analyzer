@@ -4,4 +4,19 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "altair>=5.5.0",
+    "fastparquet>=2024.11.0",
+    "matplotlib>=3.10.1",
+    "pandas>=2.2.3",
+    "polars>=1.25.2",
+    "pyarrow>=19.0.1",
+    "pydantic>=2.10.6",
+    "pytest>=8.3.5",
+    "pyyaml>=6.0.2",
+    "ruff>=0.11.0",
+]
+
+[tool.ruff]
+select = ["E", "F", "I"]
+ignore = ["E501"]
