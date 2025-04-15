@@ -20,3 +20,6 @@ class InputColumn(StrEnum):
     STRAIGHT_RANK = "straight_rank"
     SET_RANK = "set_rank"
     BEST_HAND = "best_hand"
+    BEST_HAND_VALUE = "best_hand_value"
+    DRAW_BEST_HAND = "draw_best_hand"
+    DRAW_BEST_HAND_VALUE = "draw_best_hand_value"

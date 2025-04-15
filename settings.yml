@@ -4,7 +4,8 @@ CARD_IMAGE_FOLDER: "media/cards"
 LOG_TO_FILE: False
 INPUT_FOLDER: "input"
 OUTPUT_FOLDER: "output"
-SAVE_PARSED_AS_CSV: True
+SAVE_CACHE: False
+SAVE_CACHE_COPY_AS_CSV: True
 
 # noinspection YAMLIncompatibleTypes
 KPIS:
@@ -16,11 +17,11 @@ KPIS:
       - column: "pair_rank"
         operation: "in"
         value: 9
-  - display_name: "AA"
+  - display_name: "AAA"
     requirements:
         - column: "best_hand"
           operation: "eq"
-          value: "One Pair"
+          value: "Three of a Kind"
         - column: "pair_rank"
           operation: "in"
           value: 14

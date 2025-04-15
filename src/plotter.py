@@ -39,7 +39,7 @@ def plot_chart(file: Path = None):
             rectangle.set_linewidth(1)
             label = (
                 f"{int(rectangle.get_height() * 100)}%"
-                if rectangle.get_height() > 0
+                if f"{int(rectangle.get_height() * 100)}%" != "0%"
                 else ""
             )
             labels.append(label)

@@ -25,24 +25,6 @@ def mark_as_processed(
     os.rename(src=f"{folder_name}/{file_name}", dst=destination_file)
 
 
-def generate_hands(hole_cards, community_cards):
-    # Generate all combinations of 2 hole cards and 3 community cards
-    hole_combinations = list(combinations(hole_cards, 2))
-    community_combinations = list(combinations(community_cards, 3))
-
-    # Combine them into 5-card hands
-    hands = [
-        list(hole) + list(community)
-        for hole in hole_combinations
-        for community in community_combinations
-    ]
-    return hands
-
-
-def generate_combinations(items: list, n: int) -> list:
-    return list(combinations(items, n))
-
-
 def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFrame | polars.LazyFrame:
     logger.debug(f"Reading file: {file}")
     start = time.time()
@@ -135,256 +117,6 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     return dataframe
 
 
-def analyze_data(
-    dataframe: polars.DataFrame | polars.LazyFrame,
-) -> polars.DataFrame | polars.LazyFrame:
-    logger.debug("Generating hand string")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("hand").list.join("").alias("hand_str")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Generating ranks")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("hand_str").str.extract_all(r"([2-9TJQKA])").alias("ranks")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Generating suits")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("hand_str").str.extract_all(r"([hdcs])").alias("suits")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Dropping hand_str column")
-    start = time.time()
-    dataframe = dataframe.drop("hand_str")
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating number of unique ranks")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("ranks")
-        .list.n_unique()
-        .alias("num_unique_ranks")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating ranks")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("ranks")
-        .list.eval(polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14}))
-        .cast(polars.List(polars.UInt8))
-        .list.sort()
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating reversed ranks")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("ranks")
-        .list.eval(
-            polars.when(polars.element().eq(14)).then(1).otherwise(polars.element())
-        )
-        .list.sort()
-        .alias("ranks_reversed")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating unique_ranks")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("ranks")
-        .list.unique()
-        .alias("unique_ranks")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating rank counts")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("ranks")
-        .list.eval(
-            polars.element().unique_counts()
-        )
-        .alias("rank_counts")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating number of unique suits")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("suits")
-        .list.n_unique()
-        .alias("num_unique_suits")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating rank difference")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("ranks")
-        .list.eval(polars.element().max() - polars.element().min())
-        .list.first()
-        .alias("rank_difference")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    return dataframe
-
-
-def construct_poker_results(
-    dataframe: polars.DataFrame | polars.LazyFrame,
-) -> polars.DataFrame | polars.LazyFrame:
-    logger.debug("Calculating is_flush")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("num_unique_suits").eq(1).alias("is_flush")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_straight")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("num_unique_ranks")
-        .eq(5)
-        .and_(polars.col("rank_difference").eq(4))
-        .alias("is_straight")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_straight_flush")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("is_straight")
-        .and_(polars.col("is_flush"))
-        .alias("is_straight_flush")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_pair")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("rank_counts")
-        .list.contains(2)
-        .alias("is_pair")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_two_pair")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("is_pair")
-        .eq(True)
-        .and_(polars.col("rank_counts").list.len().eq(3))
-        .alias("is_two_pair")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_trips")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("rank_counts")
-        .list.contains(3)
-        .alias("is_trips")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_quads")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("rank_counts")
-        .list.contains(4)
-        .alias("is_quads")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Calculating is_full_house")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("is_trips").and_(polars.col("is_pair")).alias("is_full_house")
-    )
-    logger.debug(f"Done in {time.time() - start:.3f} seconds")
-
-    logger.debug("Calculating pair_rank")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.when(polars.col("is_pair"))
-        .then(
-            polars.col("unique_ranks")
-            .list.get(
-                polars.col("rank_counts")
-                .list.eval(polars.element().index_of(polars.lit(2, dtype=polars.UInt8)))
-                .list.first()
-            )
-        )
-        .otherwise(polars.lit(None))
-        .alias("pair_rank")
-    )
-    logger.debug(f"Done in {time.time() - start:.3f} seconds")
-
-    logger.debug("Calculating full_house_pair_rank")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.when(polars.col("is_full_house"))
-        .then(
-            polars.col("pair_rank")
-        )
-        .otherwise(polars.lit(None))
-        .alias("full_house_pair_rank")
-    )
-    logger.debug(f"Done in {time.time() - start:.3f} seconds")
-
-    logger.debug("Calculating flush_rank")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.when(polars.col("is_flush"))
-        .then(
-            polars.col("unique_ranks")
-            .list.min()
-        )
-        .otherwise(polars.lit(None))
-        .alias("flush_rank")
-    )
-    logger.debug(f"Done in {time.time() - start:.3f} seconds")
-
-    logger.debug("Calculating straight_rank")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.when(polars.col("is_straight"))
-        .then(
-            polars.col("unique_ranks")
-            .list.min()
-        )
-        .otherwise(polars.lit(None))
-        .alias("straight_rank")
-    )
-    logger.debug(f"Done in {time.time() - start:.3f} seconds")
-
-    logger.debug("Calculating set_rank")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.when(polars.col("is_trips"))
-        .then(
-            polars.col("unique_ranks")
-            .list.get(
-                polars.col("rank_counts")
-                .list.eval(polars.element().index_of(polars.lit(3, dtype=polars.UInt8)))
-                .list.first()
-            )
-        )
-        .otherwise(polars.lit(None))
-        .alias("set_rank")
-    )
-    logger.debug(f"Done in {time.time() - start:.3f} seconds")
-
-    return dataframe
-
-
 def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
     dataframe = dataframe.group_by("row_idx").agg(
         polars.col("action").first(),
@@ -404,71 +136,35 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         polars.col("flush_rank").filter(polars.col("is_flush")).unique().reverse(),
         polars.col("straight_rank").filter(polars.col("is_straight")).unique().reverse(),
         polars.col("set_rank").filter(polars.col("is_trips")).unique().reverse(),
+        polars.col("best_hand_value").min(),
+    )
+    dataframe = dataframe.with_columns(
+        polars.col("best_hand_value")
+        .cast(polars.String)
+        .str.replace("1", "Straight Flush")
+        .str.replace("2", "Flush")
+        .str.replace("3", "Straight")
+        .str.replace("4", "Four of a Kind")
+        .str.replace("5", "Full House")
+        .str.replace("6", "Three of a Kind")
+        .str.replace("7", "Two Pair")
+        .str.replace("8", "One Pair")
+        .str.replace("9", "High Card")
+        .alias("best_hand")
     )
     dataframe = dataframe.drop("row_idx")
     return dataframe
 
 
-def assign_best_hand(dataframe: polars.DataFrame) -> polars.DataFrame:
-    dataframe = dataframe.with_columns([
-        polars.when(polars.col("is_straight_flush"))
-        .then(polars.lit(BEST_HANDS["is_straight_flush"]))
-        .when(polars.col("is_quads"))
-        .then(polars.lit(BEST_HANDS["is_quads"]))
-        .when(polars.col("is_full_house"))
-        .then(polars.lit(BEST_HANDS["is_full_house"]))
-        .when(polars.col("is_flush"))
-        .then(polars.lit(BEST_HANDS["is_flush"]))
-        .when(polars.col("is_straight"))
-        .then(polars.lit(BEST_HANDS["is_straight"]))
-        .when(polars.col("is_trips"))
-        .then(polars.lit(BEST_HANDS["is_trips"]))
-        .when(polars.col("is_two_pair"))
-        .then(polars.lit(BEST_HANDS["is_two_pair"]))
-        .when(polars.col("is_pair"))
-        .then(polars.lit(BEST_HANDS["is_pair"]))
-        .otherwise(polars.lit("High Card"))
-        .alias("best_hand")
-    ])
-    return dataframe
-
-
 def save_to_csv(dataframe: polars.DataFrame, filename: str) -> None:
-    dataframe = dataframe.with_columns(
-        polars.col("community_cards").list.join(','),
-        polars.col("hole_cards").list.join(','),
-        polars.col("pair_rank").cast(polars.List(polars.String)).list.join(','),
-        polars.col("full_house_pair_rank").cast(polars.List(polars.String)).list.join(','),
-        polars.col("flush_rank").cast(polars.List(polars.String)).list.join(','),
-        polars.col("straight_rank").cast(polars.List(polars.String)).list.join(','),
-        polars.col("set_rank").cast(polars.List(polars.String)).list.join(','),
-    )
+    for column in dataframe.columns:
+        if dataframe.schema[column] == polars.List:
+            dataframe = dataframe.with_columns(
+                polars.col(column)
+                .cast(polars.List(polars.String))
+                .list.join(',')
+            )
     dataframe.write_csv(filename)
-
-
-def read_poker_hands_db() -> polars.DataFrame:
-    # reads poker_hands.db and returns a polars dataframe where the index is the hand column
-    conn = sqlite3.connect("poker_hands.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM poker_hands")
-    rows = cursor.fetchall()
-    columns = [column[0] for column in cursor.description]
-    dataframe = polars.DataFrame(rows, schema=columns, orient="row", infer_schema_length=None)
-    conn.close()
-    dataframe = dataframe.drop("id")
-    dataframe.write_parquet("poker_hands.parquet")
-    return dataframe
-
-
-def card_rank(card):
-    rank_order = "23456789TJQKA"
-    return rank_order.index(card[0])
-
-
-def normalize_hand(hand_string):
-    cards = [hand_string[i:i+2] for i in range(0, len(hand_string), 2)]
-    sorted_cards = sorted(cards, key=card_rank)
-    return ''.join(sorted_cards)
 
 
 def apply_poker_hands(poker_hands: polars.DataFrame, dataframe: polars.DataFrame) -> polars.DataFrame:
@@ -495,11 +191,8 @@ def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame |
         logger.info(f"Processing: {file}")
 
         dataframe = read_file(file=file, lazy=lazy, head=head)
-        # dataframe = analyze_data(dataframe=dataframe)
-        # dataframe = construct_poker_results(dataframe=dataframe)
         dataframe = apply_poker_hands(poker_hands=poker_hands, dataframe=dataframe)
         dataframe = collapse_on_index(dataframe=dataframe)
-        dataframe = assign_best_hand(dataframe=dataframe)
 
         if output is None:
             output = dataframe
@@ -510,8 +203,9 @@ def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame |
         cards = "".join(files[0].cards)
         actions = "-".join(file.action.title() for file in files)
         filename = f"{SETTINGS.OUTPUT_FOLDER}/parsed_{SETTINGS.TIMESTAMP_LABEL}_{cards}_{actions}"
-        output.write_parquet(f"{filename}.parquet")
-        if SETTINGS.SAVE_PARSED_AS_CSV:
+        if SETTINGS.SAVE_CACHE:
+            output.write_parquet(f"{filename}.parquet")
+        if SETTINGS.SAVE_CACHE_COPY_AS_CSV:
             save_to_csv(dataframe=output, filename=f"{filename}.csv")
 
     return output
