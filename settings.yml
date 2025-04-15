@@ -4,6 +4,7 @@ CARD_IMAGE_FOLDER: "media/cards"
 LOG_TO_FILE: False
 INPUT_FOLDER: "input"
 OUTPUT_FOLDER: "output"
+SAVE_PARSED_AS_CSV: True
 
 # noinspection YAMLIncompatibleTypes
 KPIS:

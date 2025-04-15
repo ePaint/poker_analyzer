@@ -16,6 +16,7 @@ class Settings(BaseModel):
     INPUT_FOLDER: Optional[Path] = Path("input")
     OUTPUT_FOLDER: Optional[Path] = Path("output")
     LOG_TO_FILE: Optional[bool] = False
+    SAVE_PARSED_AS_CSV: Optional[bool] = False
     TIMESTAMP: Optional[str] = ""
     TIMESTAMP_LABEL: Optional[str] = ""
     INPUT_FILE_REGEX: Optional[re.Pattern] = re.compile(r"([2-9tjqka][hdcs]){3,5}_(call|fold|raise|check|bet)\.txt")

@@ -471,6 +471,9 @@ def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame |
     if output is not None:
         cards = "".join(files[0].cards)
         actions = "-".join(file.action.title() for file in files)
-        output.write_parquet(f"{SETTINGS.OUTPUT_FOLDER}/parsed_{SETTINGS.TIMESTAMP_LABEL}_{cards}_{actions}.parquet")
+        filename = f"{SETTINGS.OUTPUT_FOLDER}/parsed_{SETTINGS.TIMESTAMP_LABEL}_{cards}_{actions}"
+        output.write_parquet(f"{filename}.parquet")
+        if SETTINGS.SAVE_PARSED_AS_CSV:
+            save_to_csv(dataframe=output, filename=f"{filename}.csv")
 
     return output
