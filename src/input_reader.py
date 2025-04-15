@@ -133,6 +133,7 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         polars.col("straight_rank").filter(polars.col("is_straight")).unique().reverse(),
         polars.col("set_rank").filter(polars.col("is_trips")).unique().reverse(),
         polars.col("best_hand_value").min(),
+        polars.col("draw_best_hand_value").min(),
     )
     dataframe = dataframe.with_columns(
         polars.col("best_hand_value")
@@ -147,6 +148,20 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         .str.replace("8", "One Pair")
         .str.replace("9", "High Card")
         .alias("best_hand")
+    )
+    dataframe = dataframe.with_columns(
+        polars.col("draw_best_hand_value")
+        .cast(polars.String)
+        .str.replace("1", "Straight Flush")
+        .str.replace("2", "Flush")
+        .str.replace("3", "Straight")
+        .str.replace("4", "Four of a Kind")
+        .str.replace("5", "Full House")
+        .str.replace("6", "Three of a Kind")
+        .str.replace("7", "Two Pair")
+        .str.replace("8", "One Pair")
+        .str.replace("9", "High Card")
+        .alias("draw_best_hand"),
     )
     dataframe = dataframe.drop("row_idx")
     return dataframe

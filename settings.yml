@@ -4,7 +4,7 @@ CARD_IMAGE_FOLDER: "media/cards"
 LOG_TO_FILE: False
 INPUT_FOLDER: "input"
 OUTPUT_FOLDER: "output"
-SAVE_CACHE: False
+SAVE_CACHE: True
 SAVE_CACHE_COPY_AS_CSV: True
 
 # noinspection YAMLIncompatibleTypes
@@ -25,3 +25,11 @@ KPIS:
         - column: "pair_rank"
           operation: "in"
           value: 14
+  - display_name: "Gutshot"
+    requirements:
+        - column: "draw_best_hand_value"
+          operation: "eq"
+          value: 2
+        - column: "best_hand_value"
+          operation: "gt"
+          value: 2
