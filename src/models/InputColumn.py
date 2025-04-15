@@ -2,7 +2,6 @@ from enum import StrEnum
 
 
 class InputColumn(StrEnum):
-    ROW_IDX = "row_idx"
     ACTION = "action"
     WEIGHT = "weight"
     COMMUNITY_CARDS = "community_cards"

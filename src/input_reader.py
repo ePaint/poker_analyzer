@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 import time
 from itertools import combinations
 
@@ -127,7 +128,7 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     logger.debug("Combining hole and community card combinations")
     start = time.time()
     dataframe = dataframe.with_columns(
-        polars.concat_list(["hole_hand", "community_hand"]).alias("hand")
+        polars.concat_list(["hole_hand", "community_hand"]).list.sort().list.join("").alias("hand")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
@@ -445,6 +446,41 @@ def save_to_csv(dataframe: polars.DataFrame, filename: str) -> None:
     dataframe.write_csv(filename)
 
 
+def read_poker_hands_db() -> polars.DataFrame:
+    # reads poker_hands.db and returns a polars dataframe where the index is the hand column
+    conn = sqlite3.connect("poker_hands.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM poker_hands")
+    rows = cursor.fetchall()
+    columns = [column[0] for column in cursor.description]
+    dataframe = polars.DataFrame(rows, schema=columns, orient="row", infer_schema_length=None)
+    conn.close()
+    dataframe = dataframe.drop("id")
+    dataframe.write_parquet("poker_hands.parquet")
+    return dataframe
+
+
+def card_rank(card):
+    rank_order = "23456789TJQKA"
+    return rank_order.index(card[0])
+
+
+def normalize_hand(hand_string):
+    cards = [hand_string[i:i+2] for i in range(0, len(hand_string), 2)]
+    sorted_cards = sorted(cards, key=card_rank)
+    return ''.join(sorted_cards)
+
+
+def apply_poker_hands(poker_hands: polars.DataFrame, dataframe: polars.DataFrame) -> polars.DataFrame:
+    dataframe = dataframe.join(
+        poker_hands,
+        left_on="hand",
+        right_on="hand",
+        how="left",
+    )
+    return dataframe
+
+
 def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame | None:
     files = []
     for filepath in SETTINGS.INPUT_FOLDER.iterdir():
@@ -453,13 +489,15 @@ def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame |
         logger.info(f"Reading file: {filepath}")
         files.append(File(filepath))
 
+    poker_hands = polars.read_parquet("poker_hands.parquet")
     output = None
     for file in files:
         logger.info(f"Processing: {file}")
 
         dataframe = read_file(file=file, lazy=lazy, head=head)
-        dataframe = analyze_data(dataframe=dataframe)
-        dataframe = construct_poker_results(dataframe=dataframe)
+        # dataframe = analyze_data(dataframe=dataframe)
+        # dataframe = construct_poker_results(dataframe=dataframe)
+        dataframe = apply_poker_hands(poker_hands=poker_hands, dataframe=dataframe)
         dataframe = collapse_on_index(dataframe=dataframe)
         dataframe = assign_best_hand(dataframe=dataframe)
 
