@@ -33,3 +33,15 @@ KPIS:
         - column: "best_hand_value"
           operation: "gt"
           value: 2
+  - display_name: "AT"
+    requirements:
+        - column: "best_hand"
+          operation: "eq"
+          value: "Two Pair"
+        - column: "pair_rank"
+          operation: "in"
+          value: 14
+        - column: "pair_rank"
+          operation: "in"
+          value: 10
+

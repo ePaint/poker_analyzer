@@ -16,10 +16,10 @@ class KPIOperation(StrEnum):
 
 BEST_HANDS = {
     InputColumn.IS_STRAIGHT_FLUSH: "Straight Flush",
-    InputColumn.IS_FLUSH: "Flush",
-    InputColumn.IS_STRAIGHT: "Straight",
     InputColumn.IS_QUADS: "Four of a Kind",
     InputColumn.IS_FULL_HOUSE: "Full House",
+    InputColumn.IS_FLUSH: "Flush",
+    InputColumn.IS_STRAIGHT: "Straight",
     InputColumn.IS_TRIPS: "Three of a Kind",
     InputColumn.IS_TWO_PAIR: "Two Pair",
     InputColumn.IS_PAIR: "One Pair",
