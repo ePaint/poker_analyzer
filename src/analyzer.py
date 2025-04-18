@@ -23,6 +23,8 @@ def get_requirement_condition(dataframe: polars.DataFrame, requirement: KPIRequi
         return dataframe[requirement.column] <= requirement.value
     elif requirement.operation == KPIOperation.INCLUDES:
         return dataframe[requirement.column].list.contains(requirement.value)
+    elif requirement.operation == KPIOperation.NOT_INCLUDES:
+        return ~dataframe[requirement.column].list.contains(requirement.value)
 
 
 def apply_requirement(dataframe: polars.DataFrame, requirement: KPIRequirement) -> polars.DataFrame:

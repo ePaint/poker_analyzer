@@ -12,6 +12,7 @@ class KPIOperation(StrEnum):
     LESS_THAN = "lt"
     LESS_THAN_OR_EQUALS = "lte"
     INCLUDES = "in"
+    NOT_INCLUDES = "ni"
 
 
 BEST_HANDS = {
