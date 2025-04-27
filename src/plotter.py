@@ -37,8 +37,8 @@ def plot_chart(file: Path = None):
             rectangle.set_edgecolor("black")
             rectangle.set_linewidth(1)
             label = (
-                f"{int(rectangle.get_height() * 100)}%"
-                if f"{int(rectangle.get_height() * 100)}%" != "0%"
+                f"{rectangle.get_height() * 100:.1f}%"
+                if f"{rectangle.get_height() * 100:.1f}%" != "0.0%"
                 else ""
             )
             labels.append(label)
