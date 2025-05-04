@@ -46,9 +46,9 @@ def get_chart_data(file: Path = None) -> polars.DataFrame:
 
     kpi_results = {}
     actions = dataframe["action"].unique()
+    total_weight = dataframe["weight"].sum()
     for kpi in SETTINGS.KPIS:
         logger.info(f"Processing KPI: {kpi.display_name}")
-        total_weight = dataframe["weight"].sum()
 
         for requirement in kpi.requirements:
             logger.info(f"Processing requirement: {requirement}")

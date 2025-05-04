@@ -9,39 +9,22 @@ SAVE_CACHE_COPY_AS_CSV: True
 
 # noinspection YAMLIncompatibleTypes
 KPIS:
-  - display_name: "99"
+  - display_name: "Set"
     requirements:
       - column: "best_hand"
         operation: "eq"
-        value: "One Pair"
-      - column: "pair_rank"
-        operation: "in"
-        value: 9
-  - display_name: "AAA"
-    requirements:
-        - column: "best_hand"
-          operation: "eq"
-          value: "Three of a Kind"
-        - column: "pair_rank"
-          operation: "in"
-          value: 14
-  - display_name: "Gutshot"
-    requirements:
-        - column: "draw_best_hand_value"
-          operation: "eq"
-          value: 2
-        - column: "best_hand_value"
-          operation: "gt"
-          value: 2
-  - display_name: "AT"
+        value: "Three of a Kind"
+  - display_name: "2p"
     requirements:
         - column: "best_hand"
           operation: "eq"
           value: "Two Pair"
-        - column: "pair_rank"
-          operation: "in"
-          value: 14
-        - column: "pair_rank"
-          operation: "in"
-          value: 10
+  - display_name: "Pair"
+    requirements:
+        - column: "best_hand"
+          operation: "eq"
+          value: "One Pair"
+        - column: "draw_straight_outs"
+          operation: "eq"
+          value: 4
 
