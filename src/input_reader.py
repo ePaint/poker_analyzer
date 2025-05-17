@@ -55,10 +55,7 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
             .struct.rename_fields(["weight", "hole_cards"])
             .struct.unnest()
         )
-        .with_columns(
-            polars.col("weight")
-            .cast(polars.Float32, strict=False)
-        )
+        .with_columns(polars.col("weight").cast(polars.Float32, strict=False))
         .drop("column_1")
         .with_columns(
             polars.col("hole_cards")
@@ -70,9 +67,25 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
+    logger.debug("Generating hole cards ranks")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        polars.col("hole_cards")
+        .list.join("")
+        .str.extract_all(r"([2-9TJQKA])")
+        .list.eval(
+            polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14})
+        )
+        .cast(polars.List(polars.UInt8))
+        .list.unique()
+        .list.sort()
+        .alias("hole_cards_ranks")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
     logger.debug("Generate community card combinations")
     start = time.time()
-    community_combos = (
+    hole_combos = (
         dataframe.select(["hole_cards"])
         .with_columns(polars.arange(0, polars.len()).alias("row_idx"))
         .explode("hole_cards")
@@ -91,7 +104,7 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
 
     logger.debug("Joining community card combinations")
     start = time.time()
-    dataframe = dataframe.join(community_combos, on="row_idx")
+    dataframe = dataframe.join(hole_combos, on="row_idx")
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
     logger.debug("Exploding hole and community card combinations")
@@ -106,9 +119,95 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     logger.debug("Combining hole and community card combinations")
     start = time.time()
     dataframe = dataframe.with_columns(
-        polars.concat_list(["hole_hand", "community_hand"]).list.sort().list.join("").alias("hand")
+        polars.concat_list(["hole_hand", "community_hand"])
+        .list.sort()
+        .list.join("")
+        .alias("hand")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
+    # NOTES TO SELF:
+    # TODO:
+    # - Right now, the code is 99% working but we need to compare the ranks instead of the actual cards.
+    # - First, calculate the ranks of the hole cards and the hand cards
+    # - Then, compare the ranks instead of the cards.
+
+    logger.debug("Generating hole hand ranks")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        polars.col("hole_hand")
+        .list.join("")
+        .str.extract_all(r"([2-9TJQKA])")
+        .list.eval(
+            polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14})
+        )
+        .cast(polars.List(polars.UInt8))
+        .list.unique()
+        .list.sort()
+        .alias("hole_hand_ranks")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
+    # logger.debug("Sorting hole_hand")
+    # start = time.time()
+    # dataframe = dataframe.with_columns(
+    #     polars.col("hole_hand").list.sort().alias("hole_hand")
+    # )
+    # logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
+    logger.debug("Generating first_two_match")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        (
+            polars.col("hole_cards_ranks").list.slice(-2, 2) == polars.col("hole_hand_ranks")
+        )
+        .alias("first_two_match")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
+    logger.debug("Generating second_two_match")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        (
+            polars.col("hole_cards_ranks").list.slice(-3, 2) == polars.col("hole_hand_ranks")
+        )
+        .alias("second_two_match")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
+    return dataframe
+
+
+def apply_poker_hands(
+    poker_hands: polars.DataFrame, dataframe: polars.DataFrame
+) -> polars.DataFrame:
+    dataframe = dataframe.join(
+        poker_hands,
+        left_on="hand",
+        right_on="hand",
+        how="left",
+    )
+
+    dataframe = dataframe.with_columns(
+        polars.when(
+            polars.col("draw_flush_rank").ne(0),
+        )
+        .then(
+            polars.when(
+                polars.col("first_two_match"),
+            )
+            .then(1)
+            .otherwise(
+                polars.when(
+                    polars.col("second_two_match")
+                )
+                .then(2)
+                .otherwise(3)
+            )
+        )
+        .otherwise(None)
+        .alias("draw_flush_rank"),
+    )
 
     return dataframe
 
@@ -133,9 +232,10 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         polars.col("straight_rank").filter(polars.col("is_straight")).unique().reverse(),
         polars.col("set_rank").filter(polars.col("is_trips")).unique().reverse(),
         polars.col("best_hand_value").min(),
-        polars.col("draw_straight_outs").max(),
-        polars.col("draw_flush_rank").max(),
+        polars.col("draw_straight_outs").sum(),
+        polars.col("draw_flush_rank").min(),
     )
+
     dataframe = dataframe.with_columns(
         polars.col("best_hand_value")
         .cast(polars.String)
@@ -163,16 +263,6 @@ def save_to_csv(dataframe: polars.DataFrame, filename: str) -> None:
                 .list.join(',')
             )
     dataframe.write_csv(filename)
-
-
-def apply_poker_hands(poker_hands: polars.DataFrame, dataframe: polars.DataFrame) -> polars.DataFrame:
-    dataframe = dataframe.join(
-        poker_hands,
-        left_on="hand",
-        right_on="hand",
-        how="left",
-    )
-    return dataframe
 
 
 def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame | None:
