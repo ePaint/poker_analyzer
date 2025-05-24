@@ -175,6 +175,16 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
+    logger.debug("Generating third_two_match")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        (
+            polars.col("hole_cards_ranks").list.slice(-4, 2) == polars.col("hole_hand_ranks")
+        )
+        .alias("third_two_match")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
     return dataframe
 
 
@@ -202,7 +212,13 @@ def apply_poker_hands(
                     polars.col("second_two_match")
                 )
                 .then(2)
-                .otherwise(3)
+                .otherwise(
+                    polars.when(
+                        polars.col("third_two_match")
+                    )
+                    .then(3)
+                    .otherwise(4)
+                )
             )
         )
         .otherwise(None)
@@ -229,7 +245,7 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         polars.col("pair_rank").filter(polars.col("is_pair")).unique().reverse(),
         polars.col("full_house_pair_rank").filter(polars.col("is_full_house")).unique().reverse(),
         polars.col("flush_rank").filter(polars.col("is_flush")).unique().reverse(),
-        polars.col("straight_rank").filter(polars.col("is_straight")).unique().reverse(),
+        polars.col("straight_rank").filter(polars.col("is_straight")).max(),
         polars.col("set_rank").filter(polars.col("is_trips")).unique().reverse(),
         polars.col("best_hand_value").min(),
         polars.col("draw_straight_outs").sum(),
