@@ -116,7 +116,7 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
-    logger.debug("Combining hole and community card combinations")
+    logger.debug("Creating hand")
     start = time.time()
     dataframe = dataframe.with_columns(
         polars.concat_list(["hole_hand", "community_hand"])
@@ -208,21 +208,33 @@ def apply_poker_hands(
             )
             .then(1)
             .otherwise(
-                polars.when(
-                    polars.col("second_two_match")
-                )
+                polars.when(polars.col("second_two_match"))
                 .then(2)
                 .otherwise(
-                    polars.when(
-                        polars.col("third_two_match")
-                    )
-                    .then(3)
-                    .otherwise(4)
+                    polars.when(polars.col("third_two_match")).then(3).otherwise(4)
                 )
             )
         )
         .otherwise(None)
         .alias("draw_flush_rank"),
+    )
+
+    print(dataframe.columns)
+    print(dataframe.select(polars.struct(dataframe.columns)))
+
+    # count matches of each "community_hand" column card in the "draw_straight_counts_by_card" column
+    dataframe = dataframe.with_columns(
+        # polars.col("community_hand")
+        # .list.eval(
+        #     polars.col("draw_straight_counts_by_card")
+        #     .list.count_matches(element=polars.element()),
+        #     parallel=True
+        # )
+        # .list.sum()
+        polars.struct(["community_hand", "draw_straight_counts_by_card"]).map_elements(
+            lambda row: sum(row["community_hand"].count(c) for c in row["draw_straight_counts_by_card"])
+        )
+        .alias("draw_straight_outs")
     )
 
     return dataframe
