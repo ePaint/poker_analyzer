@@ -24,7 +24,4 @@ KPIS:
         - column: "best_hand"
           operation: "eq"
           value: "One Pair"
-        - column: "draw_straight_outs"
-          operation: "eq"
-          value: 4
 

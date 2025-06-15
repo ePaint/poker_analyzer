@@ -1,5 +1,6 @@
 import os
 import time
+from functools import lru_cache
 
 import polars
 
@@ -19,6 +20,18 @@ def mark_as_processed(
     else:
         destination_file = f"{folder_name}/processed/{file_name}"
     os.rename(src=f"{folder_name}/{file_name}", dst=destination_file)
+
+
+RANK_ORDER = "23456789TJQKA"  # For sorting ranks
+
+
+@lru_cache(maxsize=None)
+def get_rank_index(rank: str) -> int:
+    try:
+        return RANK_ORDER.index(rank)
+    except ValueError:
+        logger.error(f"Invalid rank: {rank}")
+        raise ValueError(f"Invalid rank: {rank}. Valid ranks are: {RANK_ORDER}")
 
 
 def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFrame | polars.LazyFrame:
@@ -121,67 +134,10 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     dataframe = dataframe.with_columns(
         polars.concat_list(["hole_hand", "community_hand"])
         .list.sort()
-        .list.join("")
-        .alias("hand")
+        .alias("hand_list")
     )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    # NOTES TO SELF:
-    # TODO:
-    # - Right now, the code is 99% working but we need to compare the ranks instead of the actual cards.
-    # - First, calculate the ranks of the hole cards and the hand cards
-    # - Then, compare the ranks instead of the cards.
-
-    logger.debug("Generating hole hand ranks")
-    start = time.time()
     dataframe = dataframe.with_columns(
-        polars.col("hole_hand")
-        .list.join("")
-        .str.extract_all(r"([2-9TJQKA])")
-        .list.eval(
-            polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14})
-        )
-        .cast(polars.List(polars.UInt8))
-        .list.unique()
-        .list.sort()
-        .alias("hole_hand_ranks")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    # logger.debug("Sorting hole_hand")
-    # start = time.time()
-    # dataframe = dataframe.with_columns(
-    #     polars.col("hole_hand").list.sort().alias("hole_hand")
-    # )
-    # logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Generating first_two_match")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        (
-            polars.col("hole_cards_ranks").list.slice(-2, 2) == polars.col("hole_hand_ranks")
-        )
-        .alias("first_two_match")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Generating second_two_match")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        (
-            polars.col("hole_cards_ranks").list.slice(-3, 2) == polars.col("hole_hand_ranks")
-        )
-        .alias("second_two_match")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Generating third_two_match")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        (
-            polars.col("hole_cards_ranks").list.slice(-4, 2) == polars.col("hole_hand_ranks")
-        )
-        .alias("third_two_match")
+        polars.col("hand_list").list.join("").alias("hand")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
@@ -198,49 +154,88 @@ def apply_poker_hands(
         how="left",
     )
 
-    dataframe = dataframe.with_columns(
-        polars.when(
-            polars.col("draw_flush_rank").ne(0),
-        )
-        .then(
-            polars.when(
-                polars.col("first_two_match"),
-            )
-            .then(1)
-            .otherwise(
-                polars.when(polars.col("second_two_match"))
-                .then(2)
-                .otherwise(
-                    polars.when(polars.col("third_two_match")).then(3).otherwise(4)
+    return dataframe
+
+
+def calculate_flush_draws(dataframe: polars.DataFrame) -> polars.DataFrame:
+    def flush_level(hand: list[str], board: list[str]) -> int:
+        suits = ["s", "h", "d", "c"]
+
+        for suit in suits:
+            hand_suit_cards = [card for card in hand if card.endswith(suit)]
+            board_suit_cards = [card for card in board if card.endswith(suit)]
+
+            if len(hand_suit_cards) >= 2 and len(board_suit_cards) >= 2:
+                known = hand_suit_cards + board_suit_cards
+                known_ranks = set(card[0] for card in known)
+
+                sorted_hand_ranks = sorted(
+                    [card[0] for card in hand_suit_cards],
+                    key=lambda r: get_rank_index(r),
+                    reverse=True,
                 )
-            )
-        )
-        .otherwise(None)
-        .alias("draw_flush_rank"),
-    )
 
-    print(dataframe.columns)
-    print(dataframe.select(polars.struct(dataframe.columns)))
+                if "A" in sorted_hand_ranks:
+                    return 1  # Nut flush draw
+                elif "K" in sorted_hand_ranks and "A" not in known_ranks:
+                    return 2  # 2nd Nut flush draw
+                elif "Q" in sorted_hand_ranks and all(
+                    x not in known_ranks for x in ["A", "K"]
+                ):
+                    return 3  # 3rd Nut flush draw
+                else:
+                    return 4  # Low flush draw
 
-    # count matches of each "community_hand" column card in the "draw_straight_counts_by_card" column
+        return 9  # No flush draw
+
+    logger.debug("Calculating flush draws")
+    start = time.time()
     dataframe = dataframe.with_columns(
-        # polars.col("community_hand")
-        # .list.eval(
-        #     polars.col("draw_straight_counts_by_card")
-        #     .list.count_matches(element=polars.element()),
-        #     parallel=True
-        # )
-        # .list.sum()
-        polars.struct(["community_hand", "draw_straight_counts_by_card"]).map_elements(
-            lambda row: sum(row["community_hand"].count(c) for c in row["draw_straight_counts_by_card"])
-        )
-        .alias("draw_straight_outs")
+        polars.struct(["hole_hand", "community_hand"]).map_elements(
+            lambda row: flush_level(row["hole_hand"], row["community_hand"]),
+            return_dtype=polars.UInt8
+        ).alias("flush_draw")
     )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
+    return dataframe
+
+
+def calculate_straight_draw_ranks(dataframe: polars.DataFrame) -> polars.DataFrame:
+    def get_straight_draw_ranks(is_straight: bool, cards: list[str]) -> list[str]:
+        if is_straight:
+            return []
+
+        indices = {get_rank_index(card[0]) for card in cards}
+        outs = set()
+
+        for pos in range(len(RANK_ORDER) - 4):
+            window = set(range(pos, pos + 5))
+            missing = window - indices
+            if len(missing) == 1:
+                missing_index = missing.pop()
+                outs.add(RANK_ORDER[missing_index])
+
+        return sorted(outs, key=get_rank_index)
+
+    logger.debug("Calculating straight draw ranks")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        polars.struct(["is_straight", "hand_list"]).map_elements(
+            lambda row: get_straight_draw_ranks(
+                is_straight=row["is_straight"],
+                cards=row["hand_list"],
+            ),
+            return_dtype=polars.List(polars.String)
+        ).alias("draw_straight_ranks")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
     return dataframe
 
 
 def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
+    logger.debug("Collapsing dataframe on row index")
     dataframe = dataframe.group_by("row_idx").agg(
         polars.col("action").first(),
         polars.col("weight").first(),
@@ -260,8 +255,8 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         polars.col("straight_rank").filter(polars.col("is_straight")).max(),
         polars.col("set_rank").filter(polars.col("is_trips")).unique().reverse(),
         polars.col("best_hand_value").min(),
-        polars.col("draw_straight_outs").sum(),
-        polars.col("draw_flush_rank").min(),
+        polars.col("flush_draw").min(),
+        polars.col("draw_straight_ranks").list.unique().alias("draw_straight_ranks"),
     )
 
     dataframe = dataframe.with_columns(
@@ -278,13 +273,106 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         .str.replace("9", "High Card")
         .alias("best_hand")
     )
+
+    dataframe = dataframe.with_columns(
+        polars.col("flush_draw")
+        .cast(polars.String)
+        .str.replace("1", "Nut Flush Draw")
+        .str.replace("2", "2nd Nut Flush Draw")
+        .str.replace("3", "3rd Nut Flush Draw")
+        .str.replace("4", "Low Flush Draw")
+        .str.replace("9", "No Flush Draw")
+        .alias("flush_draw")
+    )
+
     dataframe = dataframe.drop("row_idx")
+    return dataframe
+
+
+def calculate_straight_draw_outs(dataframe: polars.DataFrame) -> polars.DataFrame:
+    def count_unique_flat_ranks(nested_lists: list[list[str]]) -> list[str]:
+        return list(set(rank for sublist in nested_lists for rank in sublist))
+
+    dataframe = dataframe.with_columns(
+        polars.struct(["draw_straight_ranks"])
+        .map_elements(
+            lambda row: count_unique_flat_ranks(row["draw_straight_ranks"]),
+            return_dtype=polars.List(polars.String),
+        )
+        .alias("draw_straight_ranks")
+    )
+
+    def count_straight_outs(draw_ranks: list[str],
+                            hole_cards: list[str],
+                            community_cards: list[str]) -> int:
+        if not draw_ranks:
+            return 0
+
+        known_cards = hole_cards + community_cards
+        known_ranks = [card[0] for card in known_cards]  # Assuming format like "9♣", "T♠", etc.
+
+        total_outs = 0
+        for rank in draw_ranks:
+            used = known_ranks.count(rank)
+            remaining = max(0, 4 - used)
+            total_outs += remaining
+
+        return total_outs
+
+    dataframe = dataframe.with_columns(
+        polars.struct(["draw_straight_ranks", "hole_cards", "community_cards"])
+        .map_elements(
+            lambda row: count_straight_outs(
+                draw_ranks=row["draw_straight_ranks"],
+                hole_cards=row["hole_cards"],
+                community_cards=row["community_cards"]
+            ),
+            return_dtype=polars.UInt8
+        ).alias("draw_straight_outs")
+    )
+
+    return dataframe
+
+
+def re_order_columns(dataframe: polars.DataFrame) -> polars.DataFrame:
+    columns_order = [
+        "action",
+        "weight",
+        "community_cards",
+        "hole_cards",
+        "is_flush",
+        "is_straight",
+        "is_straight_flush",
+        "is_pair",
+        "is_two_pair",
+        "is_trips",
+        "is_quads",
+        "is_full_house",
+        "pair_rank",
+        "full_house_pair_rank",
+        "flush_rank",
+        "straight_rank",
+        "set_rank",
+        "best_hand_value",
+        "best_hand",
+        "flush_draw",
+        "draw_straight_ranks",
+        "draw_straight_outs",
+    ]
+    dataframe = dataframe.select(columns_order)
     return dataframe
 
 
 def save_to_csv(dataframe: polars.DataFrame, filename: str) -> None:
     for column in dataframe.columns:
-        if dataframe.schema[column] == polars.List:
+        schema = dataframe.schema[column]
+        print(f"Processing column: {column} with schema: {schema}")
+        if schema == polars.List(polars.String):
+            dataframe = dataframe.with_columns(
+                polars.col(column)
+                .list.join(',')
+            )
+        elif schema == polars.List:
             dataframe = dataframe.with_columns(
                 polars.col(column)
                 .cast(polars.List(polars.String))
@@ -308,7 +396,11 @@ def read_input_files(lazy: bool = False, head: int = None) -> polars.DataFrame |
 
         dataframe = read_file(file=file, lazy=lazy, head=head)
         dataframe = apply_poker_hands(poker_hands=poker_hands, dataframe=dataframe)
+        dataframe = calculate_flush_draws(dataframe=dataframe)
+        dataframe = calculate_straight_draw_ranks(dataframe=dataframe)
         dataframe = collapse_on_index(dataframe=dataframe)
+        dataframe = calculate_straight_draw_outs(dataframe=dataframe)
+        dataframe = re_order_columns(dataframe=dataframe)
 
         if output is None:
             output = dataframe
