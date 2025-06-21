@@ -6,9 +6,6 @@ import pandas
 from src.analyzer import get_chart_data
 
 
-FIGURE_NUMBER = 0
-
-
 def plot_chart_data(chart_data: pandas.DataFrame,
                     kind: str,
                     title: str,
@@ -74,15 +71,16 @@ def plot_chart(file: Path = None):
         },
         show_legend=True,
     )
-    plot_chart_data(
-        chart_data=check_line_chart_data,
-        kind="line",
-        title="Check Rate by KPI",
-        xlabel="KPI",
-        ylabel="Check Rate",
-        colors={
-            "check": "#f1c232",
-        },
-        show_legend=False,
-    )
+    if check_line_chart_data is not None:
+        plot_chart_data(
+            chart_data=check_line_chart_data,
+            kind="line",
+            title="Check Rate by KPI",
+            xlabel="KPI",
+            ylabel="Check Rate",
+            colors={
+                "check": "#f1c232",
+            },
+            show_legend=False,
+        )
     plt.show()

@@ -35,7 +35,7 @@ def apply_requirement(dataframe: polars.DataFrame, requirement: KPIRequirement) 
     return dataframe.filter(requirement_condition)
 
 
-def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame):
+def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame | None):
     if file is not None:
         dataframe = polars.read_parquet(file)
         if dataframe is None:
@@ -75,7 +75,7 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame):
             percentage = (weight / total_weight) * 100
             general_bar_chart[kpi.display_name][action] = percentage
             logger.info(f"Percentage of {action}: {percentage:.2f}%")
-        check_line_chart[kpi.display_name][Action.CHECK] = (weight_by_action[Action.CHECK] / total_weight) * 100
+        check_line_chart[kpi.display_name][Action.CHECK] = (weight_by_action.get(Action.CHECK, 0) / total_weight) * 100
 
         total_percentage = sum(general_bar_chart[kpi.display_name].values())
         for action in actions:
@@ -92,5 +92,5 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame):
 
     return (
         polars.DataFrame(general_bar_chart).to_pandas(),
-        polars.DataFrame(check_line_chart).to_pandas()
+        polars.DataFrame(check_line_chart).to_pandas() if Action.CHECK in actions else None
     )
