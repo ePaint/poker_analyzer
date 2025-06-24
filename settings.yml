@@ -24,4 +24,7 @@ KPIS:
         - column: "best_hand"
           operation: "eq"
           value: "One Pair"
+        - column: "flush_draw"
+          operation: "ne"
+          value: "No Flush Draw"
 
