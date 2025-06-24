@@ -48,7 +48,7 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame | N
     base_dataframe = dataframe.clone()
 
     general_bar_chart = {}
-    check_line_chart = {}
+    bet_line_chart = {}
     actions = dataframe["action"].unique()
     total_weight = dataframe["weight"].sum()
     for kpi in SETTINGS.KPIS:
@@ -62,7 +62,7 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame | N
         if dataframe.shape[0] == 0:
             logger.warning("No rows match the KPI requirements.")
             general_bar_chart[kpi.display_name] = {action: 0 for action in actions}
-            check_line_chart[kpi.display_name] = {Action.CHECK: 0}
+            bet_line_chart[kpi.display_name] = {Action.BET: 0}
             continue
 
         weight_by_action = {}
@@ -70,27 +70,27 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame | N
             weight_by_action[action] = dataframe.filter(dataframe["action"] == action)["weight"].sum()
 
         general_bar_chart[kpi.display_name] = {}
-        check_line_chart[kpi.display_name] = {}
+        bet_line_chart[kpi.display_name] = {}
         for action, weight in weight_by_action.items():
             percentage = (weight / total_weight) * 100
             general_bar_chart[kpi.display_name][action] = percentage
             logger.info(f"Percentage of {action}: {percentage:.2f}%")
-        check_line_chart[kpi.display_name][Action.CHECK] = (weight_by_action.get(Action.CHECK, 0) / total_weight) * 100
+        bet_line_chart[kpi.display_name][Action.BET] = (weight_by_action.get(Action.BET, 0) / total_weight) * 100
 
         total_percentage = sum(general_bar_chart[kpi.display_name].values())
         for action in actions:
             general_bar_chart[kpi.display_name][action] /= total_percentage
-        check_line_chart[kpi.display_name][Action.CHECK] /= total_percentage
+        bet_line_chart[kpi.display_name][Action.BET] /= total_percentage
 
         general_bar_chart[f'{kpi.display_name}\n{total_percentage:.2f}%'] = general_bar_chart[kpi.display_name]
         del general_bar_chart[kpi.display_name]
 
-        check_line_chart[f'{kpi.display_name}\n{total_percentage:.2f}%'] = check_line_chart[kpi.display_name]
-        del check_line_chart[kpi.display_name]
+        bet_line_chart[f'{kpi.display_name}\n{total_percentage:.2f}%'] = bet_line_chart[kpi.display_name]
+        del bet_line_chart[kpi.display_name]
 
         dataframe = base_dataframe.join(dataframe, on=base_dataframe.columns, how="anti")
 
     return (
         polars.DataFrame(general_bar_chart).to_pandas(),
-        polars.DataFrame(check_line_chart).to_pandas() if Action.CHECK in actions else None
+        polars.DataFrame(bet_line_chart).to_pandas() if Action.BET in actions else None
     )

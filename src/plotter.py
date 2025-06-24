@@ -55,7 +55,7 @@ def plot_chart_data(chart_data: pandas.DataFrame,
 
 
 def plot_chart(file: Path = None):
-    general_bar_chart_data, check_line_chart_data = get_chart_data(file=file)
+    general_bar_chart_data, bet_line_chart_data = get_chart_data(file=file)
     plot_chart_data(
         chart_data=general_bar_chart_data,
         kind="bar",
@@ -71,15 +71,15 @@ def plot_chart(file: Path = None):
         },
         show_legend=True,
     )
-    if check_line_chart_data is not None:
+    if bet_line_chart_data is not None:
         plot_chart_data(
-            chart_data=check_line_chart_data,
+            chart_data=bet_line_chart_data,
             kind="line",
-            title="Check Rate by KPI",
+            title="Bet Rate by KPI",
             xlabel="KPI",
-            ylabel="Check Rate",
+            ylabel="Bet Rate",
             colors={
-                "check": "#f1c232",
+                "bet": "#3d85c6",
             },
             show_legend=False,
         )
