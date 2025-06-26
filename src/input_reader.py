@@ -23,6 +23,7 @@ def mark_as_processed(
 
 
 RANK_ORDER = "23456789TJQKA"  # For sorting ranks
+REVERSED_RANK_ORDER = RANK_ORDER[::-1]  # For reversed order
 
 
 @lru_cache(maxsize=None)
@@ -163,25 +164,26 @@ def calculate_flush_draws(dataframe: polars.DataFrame) -> polars.DataFrame:
 
         for suit in suits:
             hand_suit_cards = [card for card in hand if card.endswith(suit)]
+            hand_ranks = set(card[0] for card in hand_suit_cards)
             board_suit_cards = [card for card in board if card.endswith(suit)]
+            board_ranks = set(card[0] for card in board_suit_cards)
 
             if len(hand_suit_cards) >= 2 and len(board_suit_cards) >= 2:
-                known = hand_suit_cards + board_suit_cards
-                known_ranks = set(card[0] for card in known)
+                known_ranks = set(card[0] for card in hand_suit_cards + board_suit_cards)
 
-                sorted_hand_ranks = sorted(
-                    [card[0] for card in hand_suit_cards],
-                    key=lambda r: get_rank_index(r),
-                    reverse=True,
-                )
+                highest_board_rank_index = 0
+                while True:
+                    highest_possible_rank = REVERSED_RANK_ORDER[highest_board_rank_index]
+                    if highest_possible_rank in board_ranks:
+                        highest_board_rank_index += 1
+                    else:
+                        break
 
-                if "A" in sorted_hand_ranks:
+                if REVERSED_RANK_ORDER[highest_board_rank_index] in hand_ranks:
                     return 1  # Nut flush draw
-                elif "K" in sorted_hand_ranks and "A" not in known_ranks:
+                elif REVERSED_RANK_ORDER[highest_board_rank_index+1] in hand_ranks and REVERSED_RANK_ORDER[highest_board_rank_index] not in known_ranks:
                     return 2  # 2nd Nut flush draw
-                elif "Q" in sorted_hand_ranks and all(
-                    x not in known_ranks for x in ["A", "K"]
-                ):
+                elif REVERSED_RANK_ORDER[highest_board_rank_index+2] in hand_ranks and all(x not in known_ranks for x in [REVERSED_RANK_ORDER[highest_board_rank_index], REVERSED_RANK_ORDER[highest_board_rank_index+1]]):
                     return 3  # 3rd Nut flush draw
                 else:
                     return 4  # Low flush draw
