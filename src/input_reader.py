@@ -130,6 +130,20 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
+    logger.debug("Creating hole hand ranks")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        polars.col("hole_hand")
+        .list.join("")
+        .str.extract_all(r"([2-9TJQKA])")
+        .list.eval(
+            polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14})
+        )
+        .cast(polars.List(polars.UInt8))
+        .alias("hole_hand_ranks")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
     logger.debug("Creating hand")
     start = time.time()
     dataframe = dataframe.with_columns(
@@ -200,6 +214,16 @@ def calculate_flush_draws(dataframe: polars.DataFrame) -> polars.DataFrame:
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
+    logger.debug("Calculating flush ranks")
+    start = time.time()
+    dataframe = dataframe.with_columns(
+        polars.when(polars.col("is_flush"))
+        .then(polars.col("hole_hand_ranks").list.max())
+        .otherwise(None)
+        .alias("flush_rank")
+    )
+    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+
     return dataframe
 
 
@@ -251,14 +275,20 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
         polars.col("is_trips").any(),
         polars.col("is_quads").any(),
         polars.col("is_full_house").any(),
-        polars.col("pair_rank").filter(polars.col("is_pair")).unique().reverse(),
+        polars.col("pair_rank").flatten(),
         polars.col("full_house_pair_rank").filter(polars.col("is_full_house")).unique().reverse(),
-        polars.col("flush_rank").filter(polars.col("is_flush")).unique().reverse(),
+        polars.col("flush_rank").max(),
         polars.col("straight_rank").filter(polars.col("is_straight")).max(),
         polars.col("set_rank").filter(polars.col("is_trips")).unique().reverse(),
         polars.col("best_hand_value").min(),
         polars.col("flush_draw").min(),
         polars.col("draw_straight_ranks").list.unique().alias("draw_straight_ranks"),
+    )
+
+    dataframe = dataframe.with_columns(
+        polars.col("pair_rank")
+        .list.unique()
+        .list.reverse()
     )
 
     dataframe = dataframe.with_columns(
