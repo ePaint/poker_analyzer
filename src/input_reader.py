@@ -287,8 +287,7 @@ def collapse_on_index(dataframe: polars.DataFrame) -> polars.DataFrame:
 
     dataframe = dataframe.with_columns(
         polars.col("pair_rank")
-        .list.unique()
-        .list.reverse()
+        .list.max()
     )
 
     dataframe = dataframe.with_columns(
@@ -398,7 +397,7 @@ def re_order_columns(dataframe: polars.DataFrame) -> polars.DataFrame:
 def save_to_csv(dataframe: polars.DataFrame, filename: str) -> None:
     for column in dataframe.columns:
         schema = dataframe.schema[column]
-        print(f"Processing column: {column} with schema: {schema}")
+        logger.debug(f"Flattening column: {column} with schema: {schema}")
         if schema == polars.List(polars.String):
             dataframe = dataframe.with_columns(
                 polars.col(column)
