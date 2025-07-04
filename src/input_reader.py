@@ -228,29 +228,38 @@ def calculate_flush_draws(dataframe: polars.DataFrame) -> polars.DataFrame:
 
 
 def calculate_straight_draw_ranks(dataframe: polars.DataFrame) -> polars.DataFrame:
-    def get_straight_draw_ranks(is_straight: bool, cards: list[str]) -> list[str]:
+    def get_straight_draw_ranks(is_straight: bool, hole_hand: list[str], community_hand: list[str]) -> list[str]:
         if is_straight:
             return []
 
-        indices = {get_rank_index(card[0]) for card in cards}
+        hole_indices = {get_rank_index(card[0]) for card in hole_hand}
+        if len(hole_indices) < 2 or max(hole_indices) - min(hole_indices) > 4:
+            return []
+
+        community_indices = {get_rank_index(card[0]) for card in community_hand}
+        hand_indices = hole_indices.union(community_indices)
         outs = set()
 
-        for pos in range(len(RANK_ORDER) - 4):
-            window = set(range(pos, pos + 5))
-            missing = window - indices
-            if len(missing) == 1:
-                missing_index = missing.pop()
-                outs.add(RANK_ORDER[missing_index])
+        for index in community_indices:
+            other_indices = community_indices - {index}
+            indices = hole_indices.union(other_indices)
+            for replacement in range(0, 13):
+                if replacement in hand_indices:
+                    continue
+                new_indices = indices.union({replacement})
+                if len(new_indices) == 5 and max(new_indices) - min(new_indices) == 4:
+                    outs.add(RANK_ORDER[replacement])
 
         return sorted(outs, key=get_rank_index)
 
     logger.debug("Calculating straight draw ranks")
     start = time.time()
     dataframe = dataframe.with_columns(
-        polars.struct(["is_straight", "hand_list"]).map_elements(
+        polars.struct(["is_straight", "hole_hand", "community_hand"]).map_elements(
             lambda row: get_straight_draw_ranks(
                 is_straight=row["is_straight"],
-                cards=row["hand_list"],
+                hole_hand=row["hole_hand"],
+                community_hand=row["community_hand"],
             ),
             return_dtype=polars.List(polars.String)
         ).alias("draw_straight_ranks")
