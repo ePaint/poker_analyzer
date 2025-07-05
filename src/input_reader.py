@@ -227,36 +227,38 @@ def calculate_flush_draws(dataframe: polars.DataFrame) -> polars.DataFrame:
     return dataframe
 
 
+def _get_straight_draw_ranks(is_straight: bool, hole_hand: list[str], community_hand: list[str]) -> list[str]:
+    if is_straight:
+        return []
+
+    hole_indices = {get_rank_index(card[0]) for card in hole_hand}
+    if len(hole_indices) < 2 or max(hole_indices) - min(hole_indices) > 4:
+        return []
+
+    community_indices = {get_rank_index(card[0]) for card in community_hand}
+    outs = set()
+
+    for index in community_indices:
+        other_indices = community_indices.copy()
+        if len(other_indices) == 1:
+            continue
+        if len(community_indices) == 3:
+            other_indices -= {index}
+        indices = hole_indices.union(other_indices)
+        for replacement in range(0, 12):
+            new_indices = indices.union({replacement})
+            if len(new_indices) == 5 and max(new_indices) - min(new_indices) == 4:
+                outs.add(RANK_ORDER[replacement])
+
+    return sorted(outs, key=get_rank_index)
+
+
 def calculate_straight_draw_ranks(dataframe: polars.DataFrame) -> polars.DataFrame:
-    def get_straight_draw_ranks(is_straight: bool, hole_hand: list[str], community_hand: list[str]) -> list[str]:
-        if is_straight:
-            return []
-
-        hole_indices = {get_rank_index(card[0]) for card in hole_hand}
-        if len(hole_indices) < 2 or max(hole_indices) - min(hole_indices) > 4:
-            return []
-
-        community_indices = {get_rank_index(card[0]) for card in community_hand}
-        hand_indices = hole_indices.union(community_indices)
-        outs = set()
-
-        for index in community_indices:
-            other_indices = community_indices - {index}
-            indices = hole_indices.union(other_indices)
-            for replacement in range(0, 13):
-                if replacement in hand_indices:
-                    continue
-                new_indices = indices.union({replacement})
-                if len(new_indices) == 5 and max(new_indices) - min(new_indices) == 4:
-                    outs.add(RANK_ORDER[replacement])
-
-        return sorted(outs, key=get_rank_index)
-
     logger.debug("Calculating straight draw ranks")
     start = time.time()
     dataframe = dataframe.with_columns(
         polars.struct(["is_straight", "hole_hand", "community_hand"]).map_elements(
-            lambda row: get_straight_draw_ranks(
+            lambda row: _get_straight_draw_ranks(
                 is_straight=row["is_straight"],
                 hole_hand=row["hole_hand"],
                 community_hand=row["community_hand"],
