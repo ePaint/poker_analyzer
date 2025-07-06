@@ -245,7 +245,7 @@ def _get_straight_draw_ranks(is_straight: bool, hole_hand: list[str], community_
         if len(community_indices) == 3:
             other_indices -= {index}
         indices = hole_indices.union(other_indices)
-        for replacement in range(0, 12):
+        for replacement in range(0, 13):
             new_indices = indices.union({replacement})
             if len(new_indices) == 5 and max(new_indices) - min(new_indices) == 4:
                 outs.add(RANK_ORDER[replacement])
