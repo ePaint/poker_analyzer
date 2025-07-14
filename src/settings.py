@@ -20,7 +20,7 @@ class Settings(BaseModel):
     SAVE_CACHE_COPY_AS_CSV: Optional[bool] = False
     TIMESTAMP: Optional[str] = ""
     TIMESTAMP_LABEL: Optional[str] = ""
-    INPUT_FILE_REGEX: Optional[re.Pattern] = re.compile(r"([2-9tjqka][hdcs]){3,5}_(call|fold|raise|check|bet)\.txt")
+    INPUT_FILE_REGEX: Optional[re.Pattern] = re.compile(r"([2-9tjqka][hdcs]){3,5}_(call|fold|raise|check|bet|bet[0-9]{1,3})\.txt")
     KPIS: Optional[list[KPI]] = Field(default_factory=list)
 
 

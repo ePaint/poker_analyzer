@@ -49,14 +49,17 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     logger.debug("Generating index column")
     start = time.time()
     dataframe = dataframe.with_columns(
-        polars.arange(0, polars.count()).alias("row_idx")
+        polars.arange(0, polars.count(), dtype=polars.UInt32)
+        .alias("row_idx")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
     logger.debug("Adding action column")
     start = time.time()
     dataframe = dataframe.with_columns(
-        polars.lit(file.action).alias("action")
+        polars.lit(file.action)
+        .cast(polars.Categorical)
+        .alias("action")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
@@ -81,21 +84,21 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
-    logger.debug("Generating hole cards ranks")
-    start = time.time()
-    dataframe = dataframe.with_columns(
-        polars.col("hole_cards")
-        .list.join("")
-        .str.extract_all(r"([2-9TJQKA])")
-        .list.eval(
-            polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14})
-        )
-        .cast(polars.List(polars.UInt8))
-        .list.unique()
-        .list.sort()
-        .alias("hole_cards_ranks")
-    )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
+    # logger.debug("Generating hole cards ranks")
+    # start = time.time()
+    # dataframe = dataframe.with_columns(
+    #     polars.col("hole_cards")
+    #     .list.join("")
+    #     .str.extract_all(r"([2-9TJQKA])")
+    #     .list.eval(
+    #         polars.element().replace({"T": 10, "J": 11, "Q": 12, "K": 13, "A": 14})
+    #     )
+    #     .cast(polars.List(polars.UInt8))
+    #     .list.unique()
+    #     .list.sort()
+    #     .alias("hole_cards_ranks")
+    # )
+    # logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
     logger.debug("Generate community card combinations")
     start = time.time()
@@ -114,10 +117,6 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
             polars.concat_list(["card_1", "card_2"]).alias("hole_combos")
         )
     )
-    logger.debug(f"Done in {time.time() - start:.2f} seconds")
-
-    logger.debug("Joining community card combinations")
-    start = time.time()
     dataframe = dataframe.join(hole_combos, on="row_idx")
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
@@ -149,10 +148,8 @@ def read_file(file: File, lazy: bool = False, head: int = None) -> polars.DataFr
     dataframe = dataframe.with_columns(
         polars.concat_list(["hole_hand", "community_hand"])
         .list.sort()
-        .alias("hand_list")
-    )
-    dataframe = dataframe.with_columns(
-        polars.col("hand_list").list.join("").alias("hand")
+        .list.join("")
+        .alias("hand")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
 
@@ -263,7 +260,7 @@ def calculate_straight_draw_ranks(dataframe: polars.DataFrame) -> polars.DataFra
                 hole_hand=row["hole_hand"],
                 community_hand=row["community_hand"],
             ),
-            return_dtype=polars.List(polars.String)
+            return_dtype=polars.List(polars.Categorical)
         ).alias("draw_straight_ranks")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")
