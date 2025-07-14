@@ -53,9 +53,10 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame | N
     total_weight = dataframe["weight"].sum()
     for kpi in SETTINGS.KPIS:
         logger.info(f"Processing KPI: {kpi.display_name}")
+        start_dataframe = dataframe.clone()
 
         for requirement in kpi.requirements:
-            logger.info(f"Processing requirement: {requirement}")
+            logger.info(f"Processing requirement: {requirement} on {dataframe.shape[0]} rows")
             dataframe = apply_requirement(dataframe=dataframe, requirement=requirement)
             logger.info(f"Rows that match requirement: {dataframe.shape[0]}")
 
@@ -63,6 +64,7 @@ def get_chart_data(file: Path = None) -> (pandas.DataFrame, pandas.DataFrame | N
             logger.warning("No rows match the KPI requirements.")
             general_bar_chart[kpi.display_name] = {action: 0 for action in actions}
             bet_line_chart[kpi.display_name] = {Action.BET: 0}
+            dataframe = start_dataframe
             continue
 
         weight_by_action = {}

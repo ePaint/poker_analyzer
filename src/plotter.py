@@ -45,7 +45,7 @@ def plot_chart_data(chart_data: pandas.DataFrame,
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, _: f"{int(x * 100)}%")
     )
-    plt.ylim(0, 1)
+    plt.ylim(0, 1.05)
     plt.title(title)
     if show_legend:
         plt.legend(title=xlabel)

@@ -9,22 +9,28 @@ SAVE_CACHE_COPY_AS_CSV: True
 
 # noinspection YAMLIncompatibleTypes
 KPIS:
-  - display_name: "Set"
+  - display_name: "WRAP"
     requirements:
-      - column: "best_hand"
+      - column: "best_hand_value"
+        operation: "ne"
+        value: 3
+      - column: "draw_straight_outs"
+        operation: "gt"
+        value: 8
+  - display_name: "OESD"
+    requirements:
+      - column: "best_hand_value"
+        operation: "ne"
+        value: 3
+      - column: "draw_straight_outs"
         operation: "eq"
-        value: "Three of a Kind"
-  - display_name: "2p"
+        value: 8
+  - display_name: "GS"
     requirements:
-        - column: "best_hand"
-          operation: "eq"
-          value: "Two Pair"
-  - display_name: "Pair"
-    requirements:
-        - column: "best_hand"
-          operation: "eq"
-          value: "One Pair"
-        - column: "flush_draw"
-          operation: "ne"
-          value: "No Flush Draw"
+      - column: "best_hand_value"
+        operation: "ne"
+        value: 3
+      - column: "draw_straight_outs"
+        operation: "eq"
+        value: 4
 
