@@ -6,6 +6,7 @@ class InputColumn(StrEnum):
     WEIGHT = "weight"
     COMMUNITY_CARDS = "community_cards"
     HOLE_CARDS = "hole_cards"
+    HOLE_CARDS_RANKS = "hole_cards_ranks"
     IS_FLUSH = "is_flush"
     IS_STRAIGHT = "is_straight"
     IS_STRAIGHT_FLUSH = "is_straight_flush"

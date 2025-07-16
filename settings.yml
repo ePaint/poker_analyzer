@@ -14,9 +14,9 @@ KPIS:
       - column: "best_hand_value"
         operation: "ne"
         value: 3
-      - column: "draw_straight_outs"
-        operation: "gt"
-        value: 8
+      - column: "hole_cards_ranks"
+        operation: "in"
+        value: "QQ"
   - display_name: "OESD"
     requirements:
       - column: "best_hand_value"

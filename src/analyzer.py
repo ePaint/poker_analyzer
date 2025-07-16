@@ -24,9 +24,19 @@ def get_requirement_condition(dataframe: polars.DataFrame, requirement: KPIRequi
     elif requirement.operation == KPIOperation.LESS_THAN_OR_EQUALS:
         return dataframe[requirement.column] <= requirement.value
     elif requirement.operation == KPIOperation.INCLUDES:
-        return dataframe[requirement.column].list.contains(requirement.value)
+        if isinstance(dataframe[requirement.column].dtype, polars.datatypes.List):
+            return dataframe[requirement.column].list.contains(requirement.value)
+        elif isinstance(dataframe[requirement.column].dtype, polars.datatypes.String):
+            return dataframe[requirement.column].str.contains(requirement.value)
+        else:
+            raise ValueError(f"Column {requirement.column} is not of type List or String. Cannot apply INCLUDES operation.")
     elif requirement.operation == KPIOperation.NOT_INCLUDES:
-        return ~dataframe[requirement.column].list.contains(requirement.value)
+        if isinstance(dataframe[requirement.column].dtype, polars.datatypes.List):
+            return ~dataframe[requirement.column].list.contains(requirement.value)
+        elif isinstance(dataframe[requirement.column].dtype, polars.datatypes.String):
+            return ~dataframe[requirement.column].str.contains(requirement.value)
+        else:
+            raise ValueError(f"Column {requirement.column} is not of type List or String. Cannot apply NOT_INCLUDES operation.")
     return None
 
 
