@@ -20,27 +20,51 @@ def plot_chart_data(chart_data: pandas.DataFrame,
     merged = merged.transpose()
     merged = merged.reindex(colors.keys(), axis=1)
     merged = merged.dropna(axis=1, how="all")
-    ax = merged.plot(
-        kind=kind,
-        stacked=True,
-        figsize=(10, 6),
-        color=[colors[col] for col in merged.columns],
-        rot=0,
-        xlabel=xlabel,
-        ylabel=ylabel,
-    )
-    for container in ax.containers:
-        labels = []
-        for rectangle in container:
-            rectangle.set_edgecolor("black")
-            rectangle.set_linewidth(1)
-            label = (
-                f"{rectangle.get_height() * 100:.1f}%"
-                if f"{rectangle.get_height() * 100:.1f}%" != "0.0%"
-                else ""
-            )
-            labels.append(label)
-        ax.bar_label(container, labels=labels, label_type="center", fontsize=8)
+    plot_kwargs = {
+        "kind": kind,
+        "xlabel": xlabel,
+        "ylabel": ylabel,
+        "color": [colors[col] for col in merged.columns],
+        "figsize": (10, 6),
+        "rot": 0,
+    }
+    if kind == "bar":
+        plot_kwargs["stacked"] = True
+    if kind == "line":
+        plot_kwargs["marker"] = "o"
+        plot_kwargs["markersize"] = 4
+        plot_kwargs["linestyle"] = "-"
+        plot_kwargs["linewidth"] = 1.5
+        plot_kwargs["markerfacecolor"] = "white"
+    ax = merged.plot(**plot_kwargs)
+    if kind == "bar":
+        for container in ax.containers:
+            labels = []
+            for rectangle in container:
+                rectangle.set_edgecolor("black")
+                rectangle.set_linewidth(1)
+                label = (
+                    f"{rectangle.get_height() * 100:.1f}%"
+                    if f"{rectangle.get_height() * 100:.1f}%" != "0.0%"
+                    else ""
+                )
+                labels.append(label)
+            ax.bar_label(container, labels=labels, label_type="center", fontsize=8)
+    elif kind == "line":
+        plt.grid(True)
+        for line in ax.lines:
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            for x, y in zip(x_data, y_data):
+                if not pandas.isna(y):
+                    ax.annotate(
+                        f"{y * 100:.0f}%",
+                        xy=(x, y),
+                        xytext=(0, 5),
+                        textcoords="offset points",
+                        ha="center",
+                        fontsize=8,
+                    )
     plt.xticks(rotation=0)
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, _: f"{int(x * 100)}%")
@@ -65,7 +89,6 @@ def plot_chart(file: Path = None):
         colors={
             "call": "#cc4125",
             "fold": "#666666",
-            "raise": "#6aa84f",
             "check": "#f1c232",
             "bet": "#9fc5e8",
             "bet1": "#9fc5e8",
@@ -281,6 +304,6 @@ def plot_chart(file: Path = None):
                 "bet99": "#00668c",
                 "bet100": "#3d85c6",
             },
-            show_legend=False,
+            show_legend=True,
         )
     plt.show()

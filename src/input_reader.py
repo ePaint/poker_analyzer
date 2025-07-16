@@ -260,7 +260,7 @@ def calculate_straight_draw_ranks(dataframe: polars.DataFrame) -> polars.DataFra
                 hole_hand=row["hole_hand"],
                 community_hand=row["community_hand"],
             ),
-            return_dtype=polars.List(polars.Categorical)
+            return_dtype=polars.List(polars.Utf8)
         ).alias("draw_straight_ranks")
     )
     logger.debug(f"Done in {time.time() - start:.2f} seconds")

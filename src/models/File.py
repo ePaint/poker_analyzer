@@ -9,7 +9,8 @@ class File:
         self.path = file
         cards_raw, action_raw = self.path.stem.split("_")
         self.cards = self.parse_cards(cards_raw)
-        self.action = Action(action_raw.casefold())
+        action_raw = action_raw.casefold().replace("raise", "bet")
+        self.action = Action(action_raw)
 
     def __str__(self):
         return f"File(path={self.path}, cards={self.cards}, action={self.action})"
