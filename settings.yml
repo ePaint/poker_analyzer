@@ -9,11 +9,8 @@ SAVE_CACHE_COPY_AS_CSV: True
 
 # noinspection YAMLIncompatibleTypes
 KPIS:
-  - display_name: "WRAP"
+  - display_name: "Example"
     requirements:
-      - column: "best_hand_value"
-        operation: "ne"
-        value: 3
       - column: "hole_cards_ranks"
         operation: "in"
         value: "QQ"
